@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Planta Fácil</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#14181f;--mut:#6b7280;--line:#d9dde3;--acc:#2563eb;--ok:#16a34a;--warn:#d97706;--bad:#dc2626}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg);overscroll-behavior:none;touch-action:manipulation}
+#app{display:flex;flex-direction:column;height:100%}
+header{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header b{font-size:17px}
+.sp{flex:1}
+button{font:inherit;min-height:42px;padding:0 14px;border:1px solid var(--line);background:#fff;border-radius:10px;color:var(--ink);cursor:pointer}
+button:active{background:#eef1f5}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.ok{background:var(--ok);border-color:var(--ok);color:#fff}
+button.bad{color:var(--bad)}
+button.on{background:#dbe7ff;border-color:var(--acc);color:#0b3aa8}
+button:disabled{opacity:.45}
+input,select{font:inherit;min-height:42px;padding:0 10px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);min-width:0}
+label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--mut)}
+.view{flex:1;display:flex;flex-direction:column;min-height:0}
+.hidden{display:none!important}
+#planWrap,#wWrap{position:relative;flex:1;min-height:0;background:#fff}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none}
+#tools{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:8px;z-index:2}
+#tools button{box-shadow:0 1px 3px rgba(0,0,0,.12);min-width:92px;text-align:left}
+#hint{position:absolute;right:10px;top:10px;max-width:46%;background:rgba(20,24,31,.82);color:#fff;font-size:13px;padding:8px 12px;border-radius:10px;z-index:2;pointer-events:none}
+#sheet,#wPanel{background:var(--card);border-top:1px solid var(--line);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mut{color:var(--mut);font-size:13px}
+.len{font-size:22px;font-weight:700}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:3px 8px;border-radius:99px;vertical-align:middle;margin-left:6px}
+.badge.ok{background:#dcfce7;color:#166534}
+.badge.w{background:#fef3c7;color:#92400e}
+.wbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.seg{display:flex}
+.seg button{border-radius:0}
+.seg button:first-child{border-radius:10px 0 0 10px}
+.seg button:last-child{border-radius:0 10px 10px 0}
+#wChips{display:flex;gap:8px;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--line);overflow-x:auto;align-items:center}
+#wChips button{white-space:nowrap}
+.fld{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--mut)}
+.fld input{width:92px}
+#modal{position:fixed;inset:0;background:rgba(15,20,30,.55);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+#modal .box{background:#fff;border-radius:16px;padding:18px;max-width:480px;width:100%;display:flex;flex-direction:column;gap:12px;max-height:92vh;overflow:auto}
+#modal h3{margin:0;font-size:18px}
+#modal .big{font-size:34px;font-weight:800;color:var(--acc)}
+#modal pre{background:#0f172a;color:#a7f3d0;font-size:12px;padding:10px;border-radius:10px;height:150px;overflow:auto;margin:0;white-space:pre-wrap}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#14181f;color:#fff;padding:10px 16px;border-radius:99px;font-size:14px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <b>Planta Fácil</b>
+    <label>Pé-direito <input id="pe" type="text" inputmode="decimal" size="4" style="width:78px"> m</label>
+    <span class="sp"></span>
+    <button id="btnTrena">Trena: desconectada</button>
+    <button id="btnExport">Exportar</button>
+    <button id="btnNovo" class="bad">Novo</button>
+  </header>
+
+  <section id="vPlan" class="view">
+    <div id="planWrap">
+      <canvas id="plan"></canvas>
+      <div id="tools">
+        <button id="tDraw">Desenhar</button>
+        <button id="tSel">Selecionar</button>
+        <button id="tUndo">Desfazer</button>
+        <button id="tFit">Ajustar</button>
+        <button id="tZin">+ Zoom</button>
+        <button id="tZout">- Zoom</button>
+      </div>
+      <div id="hint"></div>
+    </div>
+    <div id="sheet"></div>
+  </section>
+
+  <section id="vWall" class="view hidden">
+    <div class="wbar">
+      <button id="wBack">← Planta</button>
+      <b id="wTitle"></b>
+      <span class="sp"></span>
+      <div class="seg"><button id="w2d">2D</button><button id="w3d">3D</button></div>
+    </div>
+    <div id="wChips"></div>
+    <div id="wWrap"><canvas id="wc"></canvas><canvas id="w3"></canvas></div>
+    <div id="wPanel"></div>
+  </section>
+</div>
+<div id="modal" class="hidden"></div>
+<div id="toast"></div>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const KEY='plantafacil.v1';
+function load(){try{return JSON.parse(localStorage.getItem(KEY))}catch(e){return null}}
+let S=load()||{pe:2.8,rooms:[],draft:null,selRoom:null,selWall:null,next:1};
+let hist=[];
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function snap(){hist.push(JSON.stringify(S));if(hist.length>60)hist.shift()}
+const fmt=v=>v.toFixed(2).replace('.',',');
+const cm=v=>Math.round(v*100);
+const num=s=>{const v=parseFloat(String(s).replace(',','.'));return isFinite(v)?v:null};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const q05=v=>Math.round(v/0.05)*0.05;
+function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('show'),2600)}
+
+/* ---------- geometria ---------- */
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function segDist(p,a,b){const vx=b.x-a.x,vy=b.y-a.y,l2=vx*vx+vy*vy;let t=l2?((p.x-a.x)*vx+(p.y-a.y)*vy)/l2:0;t=clamp(t,0,1);return Math.hypot(p.x-(a.x+t*vx),p.y-(a.y+t*vy))}
+function area(pts){let s=0;for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length];s+=a.x*b.y-b.x*a.y}return s/2}
+function inPoly(p,pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)c=!c}return c}
+const centroid=pts=>({x:pts.reduce((s,p)=>s+p.x,0)/pts.length,y:pts.reduce((s,p)=>s+p.y,0)/pts.length});
+const room=id=>S.rooms.find(r=>r.id===id);
+const geomLen=(r,i)=>dist(r.pts[i],r.pts[(i+1)%r.pts.length]);
+const wallL=(r,i)=>r.walls[i].m!=null?r.walls[i].m:geomLen(r,i);
+
+/* ---------- planta ---------- */
+const cv=$('#plan'),cx=cv.getContext('2d');
+let view={s:70,ox:90,oy:90},W=0,Hh=0,mode=S.rooms.length?'select':'draw',hover=null;
+const w2s=p=>({x:p.x*view.s+view.ox,y:p.y*view.s+view.oy});
+const s2w=p=>({x:(p.x-view.ox)/view.s,y:(p.y-view.oy)/view.s});
+function sizeCanvas(c,ctx){const r=c.parentElement.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=Math.max(1,r.width*d);c.height=Math.max(1,r.height*d);ctx.setTransform(d,0,0,d,0,0);return[r.width,r.height]}
+function resizePlan(){[W,Hh]=sizeCanvas(cv,cx);drawPlan()}
+
+function label(ctx,txt,x,y,color,bg){ctx.font='600 13px system-ui,sans-serif';const w=ctx.measureText(txt).width+12;ctx.fillStyle=bg||'#fff';ctx.strokeStyle='#cbd5e1';ctx.lineWidth=1;ctx.fillRect(x-w/2,y-11,w,22);ctx.strokeRect(x-w/2,y-11,w,22);ctx.fillStyle=color||'#14181f';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(txt,x,y+.5)}
+
+function drawPlan(){
+  const ctx=cx;ctx.clearRect(0,0,W,Hh);
+  const st=view.s;ctx.strokeStyle='#e8ebf0';ctx.lineWidth=1;ctx.beginPath();
+  for(let x=((view.ox%st)+st)%st;x<W;x+=st){ctx.moveTo(x,0);ctx.lineTo(x,Hh)}
+  for(let y=((view.oy%st)+st)%st;y<Hh;y+=st){ctx.moveTo(0,y);ctx.lineTo(W,y)}
+  ctx.stroke();
+  S.rooms.forEach(drawRoom);
+  if(S.draft)drawDraft();
+}
+function drawRoom(r){
+  const ctx=cx,n=r.pts.length,sp=r.pts.map(w2s),c=centroid(sp);
+  ctx.beginPath();sp.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();
+  ctx.fillStyle=r.id===S.selRoom?'rgba(37,99,235,.08)':'rgba(100,116,139,.07)';ctx.fill();
+  for(let i=0;i<n;i++){
+    const a=sp[i],b=sp[(i+1)%n],sel=r.id===S.selRoom&&S.selWall===i,m=r.walls[i].m!=null;
+    ctx.lineCap='round';ctx.lineWidth=sel?10:6;ctx.strokeStyle=sel?'#2563eb':(m?'#16a34a':'#64748b');
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  for(let i=0;i<n;i++){
+    const a=sp[i],b=sp[(i+1)%n],mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+    let ox=mx-c.x,oy=my-c.y;const l=Math.hypot(ox,oy)||1;ox=ox/l*20;oy=oy/l*20;
+    const m=r.walls[i].m!=null;
+    label(ctx,fmt(wallL(r,i))+(m?' ✓':''),mx+ox,my+oy,m?'#166534':'#475569',m?'#dcfce7':'#fff');
+  }
+  const ar=Math.abs(area(r.pts));
+  ctx.fillStyle='#334155';ctx.font='700 14px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(r.name,c.x,c.y-8);ctx.font='13px system-ui,sans-serif';ctx.fillStyle='#64748b';ctx.fillText(fmt(ar)+' m²',c.x,c.y+10);
+}
+function drawDraft(){
+  const ctx=cx,d=S.draft,sp=d.pts.map(w2s);
+  ctx.lineWidth=5;ctx.strokeStyle='#2563eb';ctx.lineCap='round';ctx.lineJoin='round';
+  ctx.beginPath();sp.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+  if(hover&&sp.length){const h=w2s(hover);ctx.lineTo(h.x,h.y)}ctx.stroke();
+  for(let i=1;i<sp.length;i++){const a=sp[i-1],b=sp[i];label(ctx,fmt(dist(d.pts[i-1],d.pts[i])),(a.x+b.x)/2,(a.y+b.y)/2-18,'#1d4ed8','#eff6ff')}
+  sp.forEach((p,i)=>{ctx.beginPath();ctx.arc(p.x,p.y,i===0?10:6,0,7);ctx.fillStyle=i===0?'#fff':'#2563eb';ctx.fill();ctx.lineWidth=3;ctx.strokeStyle='#2563eb';ctx.stroke()});
+}
+function fitView(){
+  const pts=[];S.rooms.forEach(r=>pts.push(...r.pts));if(S.draft)pts.push(...S.draft.pts);
+  if(!pts.length){view={s:70,ox:130,oy:90};drawPlan();return}
+  const x0=Math.min(...pts.map(p=>p.x)),x1=Math.max(...pts.map(p=>p.x)),y0=Math.min(...pts.map(p=>p.y)),y1=Math.max(...pts.map(p=>p.y));
+  const s=clamp(Math.min((W-260)/Math.max(x1-x0,.5),(Hh-120)/Math.max(y1-y0,.5)),20,250);
+  view.s=s;view.ox=(W+110)/2-(x0+x1)/2*s;view.oy=Hh/2-(y0+y1)/2*s;drawPlan();
+}
+function zoomAt(px,py,ns){ns=clamp(ns,18,300);const w=s2w({x:px,y:py});view.s=ns;view.ox=px-w.x*ns;view.oy=py-w.y*ns;drawPlan()}
+
+const ptrs=new Map();let moved=false,start=null,pinch0=null;
+const pd=()=>{const a=[...ptrs.values()];return Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y)};
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});if(ptrs.size===1){moved=false;start={x:e.offsetX,y:e.offsetY,ox:view.ox,oy:view.oy}}if(ptrs.size===2){pinch0={d:pd(),s:view.s};moved=true}});
+cv.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId)){if(mode==='draw'&&S.draft){hover=snapPt(s2w({x:e.offsetX,y:e.offsetY}));drawPlan()}return}
+  ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});
+  if(ptrs.size===2&&pinch0){const a=[...ptrs.values()];zoomAt((a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2,pinch0.s*pd()/pinch0.d);return}
+  if(ptrs.size===1&&start){const dx=e.offsetX-start.x,dy=e.offsetY-start.y;if(moved||Math.hypot(dx,dy)>8){moved=true;view.ox=start.ox+dx;view.oy=start.oy+dy;drawPlan()}}
+});
+function endPtr(e,cancel){
+  if(!ptrs.has(e.pointerId))return;
+  const wasSingle=ptrs.size===1;ptrs.delete(e.pointerId);
+  if(wasSingle&&!moved&&!cancel)tap({x:e.offsetX,y:e.offsetY});
+  if(ptrs.size<2)pinch0=null;
+}
+cv.addEventListener('pointerup',e=>endPtr(e,false));
+cv.addEventListener('pointercancel',e=>endPtr(e,true));
+cv.addEventListener('wheel',e=>{e.preventDefault();zoomAt(e.offsetX,e.offsetY,view.s*(e.deltaY<0?1.12:1/1.12))},{passive:false});
+
+function snapPt(w){
+  let x=Math.round(w.x/.1)*.1,y=Math.round(w.y/.1)*.1;
+  const d=S.draft;if(d&&d.pts.length){const l=d.pts[d.pts.length-1];if(Math.abs(x-l.x)<.16)x=l.x;if(Math.abs(y-l.y)<.16)y=l.y}
+  return{x:+x.toFixed(3),y:+y.toFixed(3)};
+}
+function tap(p){
+  if(mode==='draw'){
+    const w=snapPt(s2w(p));
+    if(!S.draft){snap();S.draft={pts:[w]};}
+    else{
+      const d=S.draft;
+      if(d.pts.length>=3&&dist(p,w2s(d.pts[0]))<24){closeDraft();return}
+      if(dist(w,d.pts[d.pts.length-1])<.05)return;
+      snap();d.pts.push(w);
+    }
+    save();renderSheet();drawPlan();return;
+  }
+  // selecionar
+  for(let k=S.rooms.length-1;k>=0;k--){
+    const r=S.rooms[k],sp=r.pts.map(w2s);
+    for(let i=0;i<sp.length;i++){
+      if(segDist(p,sp[i],sp[(i+1)%sp.length])<18){S.selRoom=r.id;S.selWall=i;save();renderSheet();drawPlan();return}
+    }
+  }
+  const w=s2w(p);
+  for(let k=S.rooms.length-1;k>=0;k--){if(inPoly(w,S.rooms[k].pts)){S.selRoom=S.rooms[k].id;S.selWall=null;save();renderSheet();drawPlan();return}}
+  S.selRoom=null;S.selWall=null;renderSheet();drawPlan();
+}
+function closeDraft(){
+  const d=S.draft;if(!d||d.pts.length<3){toast('Marque pelo menos 3 pontos');return}
+  snap();
+  const id=S.next++;
+  S.rooms.push({id,name:'Ambiente '+id,pts:d.pts,walls:d.pts.map(()=>({m:null,items:[]}))});
+  S.draft=null;S.selRoom=id;S.selWall=null;mode='select';hover=null;
+  save();renderAll();
+}
+
+/* ---------- medicao ---------- */
+let modalOpen=false;
+function modal(html,wire){const m=$('#modal');m.innerHTML='<div class="box">'+html+'</div>';m.classList.remove('hidden');modalOpen=true;wire&&wire(m)}
+function closeModal(){$('#modal').classList.add('hidden');modalOpen=false}
+function onReading(v){
+  if(modalOpen)return;
+  if(!(v>0.02&&v<80)){toast('Leitura fora da faixa: '+v);return}
+  const r=room(S.selRoom);
+  if(!r||S.selWall==null){toast('Selecione uma parede antes de medir');return}
+  const i=S.selWall,cur=wallL(r,i),d=(v-cur)*100,had=r.walls[i].m!=null;
+  modal(`<h3>Usar essa medida?</h3>
+    <div class="big">${fmt(v)} m</div>
+    <div class="mut">${r.name}, parede ${i+1}<br>${had?'Medida atual':'Desenhado'}: ${fmt(cur)} m (${d>=0?'+':''}${d.toFixed(1).replace('.',',')} cm de diferença)</div>
+    <div class="row"><button class="ok" data-a="y" style="flex:1">Usar essa medida</button><button data-a="n" style="flex:1">Descartar</button></div>`,
+    m=>m.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{closeModal();if(b.dataset.a==='y')applyMeasure(r,i,v)}));
+}
+function applyMeasure(r,i,L){
+  snap();
+  const n=r.pts.length,bi=(i+1)%n,a=r.pts[i],b=r.pts[bi];
+  const g=dist(a,b)||1,ux=(b.x-a.x)/g,uy=(b.y-a.y)/g;
+  // Move o ponto final e propaga so pelas paredes perpendiculares (mantem retangulos e Ls em esquadro)
+  const orig=r.pts.map(p=>({x:p.x,y:p.y}));
+  const perp=(ia,ib)=>{const p=orig[ia],q=orig[ib],l=dist(p,q)||1;return Math.abs(((q.x-p.x)*ux+(q.y-p.y)*uy)/l)<.2};
+  if(bi!==0){
+    const dx=a.x+ux*L-b.x,dy=a.y+uy*L-b.y;let k=bi;
+    r.pts[k]={x:r.pts[k].x+dx,y:r.pts[k].y+dy};
+    for(let t=0;t<n;t++){const nk=(k+1)%n;if(nk===i||!perp(k,nk))break;r.pts[nk]={x:r.pts[nk].x+dx,y:r.pts[nk].y+dy};k=nk}
+  }else{
+    const dx=b.x-ux*L-a.x,dy=b.y-uy*L-a.y;let k=i;
+    r.pts[k]={x:r.pts[k].x+dx,y:r.pts[k].y+dy};
+    for(let t=0;t<n;t++){const pk=(k-1+n)%n;if(pk===bi||!perp(pk,k))break;r.pts[pk]={x:r.pts[pk].x+dx,y:r.pts[pk].y+dy};k=pk}
+  }
+  r.walls[i].m=+L.toFixed(3);
+  save();renderAll();toast('Parede '+(i+1)+' medida: '+fmt(L)+' m');
+}
+
+/* ---------- painel inferior (planta) ---------- */
+function renderSheet(){
+  const sh=$('#sheet'),r=room(S.selRoom);let h='';
+  if(S.draft){
+    h=`<div class="row"><div><b>Desenhando ambiente</b><div class="mut">${S.draft.pts.length} ponto(s). Toque no primeiro ponto para fechar.</div></div><span class="sp"></span><button class="pri" data-act="close">Fechar ambiente</button><button data-act="cancel" class="bad">Cancelar</button></div>`;
+  }else if(r&&S.selWall!=null){
+    const i=S.selWall,m=r.walls[i].m!=null,L=wallL(r,i);
+    h=`<div class="row"><div><b>${r.name}, parede ${i+1}</b><div class="mut">${m?'Medida pela trena':'Medida do desenho (aproximada)'}</div></div><span class="sp"></span><div class="len">${fmt(L)} m<span class="badge ${m?'ok':'w'}">${m?'medida':'sem medir'}</span></div></div>
+    <div class="row"><input id="simVal" inputmode="decimal" placeholder="ex: 3,452" style="width:130px"><button data-act="sim">Simular leitura da trena</button><span class="mut">A leitura da trena chega aqui e pede confirmação.</span></div>`;
+    if(m)h+=`<div class="row"><button class="pri" data-act="w2d">Ver parede 2D</button><button class="pri" data-act="w3d">Ver parede 3D</button></div>`;
+    else h+=`<div class="mut">Meça esta parede com a trena para liberar a vista 2D e 3D.</div>`;
+  }else if(r){
+    h=`<div class="row"><label>Nome <input id="roomName" value="${r.name.replace(/"/g,'&quot;')}"></label><div class="mut">${fmt(Math.abs(area(r.pts)))} m², ${r.pts.length} paredes, ${r.walls.filter(w=>w.m!=null).length} medidas</div><span class="sp"></span><button class="bad" data-act="delroom">Excluir ambiente</button></div><div class="mut">Toque em uma parede para selecionar e medir.</div>`;
+  }else{
+    h=`<div class="mut">${S.rooms.length?'Toque em uma parede ou em um ambiente para selecionar.':'Use Desenhar: toque nos cantos do ambiente e feche tocando no primeiro ponto.'}</div>`;
+  }
+  sh.innerHTML=h;
+  const rn=$('#roomName');if(rn)rn.onchange=()=>{snap();r.name=rn.value.trim()||r.name;save();drawPlan()};
+  const sv=$('#simVal');if(sv)sv.onkeydown=e=>{if(e.key==='Enter')act('sim')};
+  const hint=$('#hint');
+  hint.textContent=mode==='draw'?'Toque para marcar cantos. Arraste para mover a tela.':'Toque em uma parede para selecionar. Arraste para mover a tela.';
+  $('#tDraw').classList.toggle('on',mode==='draw');$('#tSel').classList.toggle('on',mode==='select');
+}
+function act(a){
+  const r=room(S.selRoom);
+  if(a==='close')closeDraft();
+  else if(a==='cancel'){snap();S.draft=null;hover=null;save();renderAll()}
+  else if(a==='sim'){const v=num($('#simVal').value);if(v==null){toast('Digite a medida em metros');return}onReading(v)}
+  else if(a==='w2d')openWall('2d');
+  else if(a==='w3d')openWall('3d');
+  else if(a==='delroom'){snap();S.rooms=S.rooms.filter(x=>x.id!==r.id);S.selRoom=null;S.selWall=null;save();renderAll()}
+}
+$('#sheet').addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b)act(b.dataset.act)});
+$('#tDraw').onclick=()=>{mode='draw';S.selWall=null;renderSheet();drawPlan()};
+$('#tSel').onclick=()=>{mode='select';if(S.draft){snap();S.draft=null;hover=null}renderSheet();drawPlan()};
+$('#tUndo').onclick=()=>{if(!hist.length){toast('Nada para desfazer');return}S=JSON.parse(hist.pop());save();renderAll()};
+$('#tFit').onclick=fitView;
+$('#tZin').onclick=()=>zoomAt(W/2,Hh/2,view.s*1.25);
+$('#tZout').onclick=()=>zoomAt(W/2,Hh/2,view.s/1.25);
+
+/* ---------- vista da parede ---------- */
+const TY={
+  porta:{n:'Porta',w:.8,h:2.1,y:0,c:'#b45309'},
+  janela:{n:'Janela',w:1.2,h:1.0,y:1.1,c:'#0284c7'},
+  tomada:{n:'Tomada',w:.1,h:.1,y:.3,c:'#111827'},
+  interruptor:{n:'Interruptor',w:.1,h:.1,y:1.1,c:'#7c3aed'},
+  agua:{n:'Ponto de água',w:.1,h:.1,y:.6,c:'#0ea5e9'}
+};
+let wv={room:null,wall:0,m:'2d',armed:null,sel:null,yaw:-28,pitch:14};
+const wc=$('#wc'),wx=wc.getContext('2d'),w3=$('#w3'),w3x=w3.getContext('2d');
+let WW=0,WH=0;
+const curRoom=()=>room(wv.room),curWall=()=>curRoom().walls[wv.wall];
+function openWall(m){
+  const r=room(S.selRoom);if(!r||S.selWall==null)return;
+  wv={room:r.id,wall:S.selWall,m:m,armed:null,sel:null,yaw:-28,pitch:14};
+  $('#vPlan').classList.add('hidden');$('#vWall').classList.remove('hidden');
+  renderWall();
+}
+$('#wBack').onclick=()=>{$('#vWall').classList.add('hidden');$('#vPlan').classList.remove('hidden');resizePlan();renderSheet()};
+$('#w2d').onclick=()=>{wv.m='2d';renderWall()};
+$('#w3d').onclick=()=>{wv.m='3d';renderWall()};
+function renderWall(){
+  const r=curRoom(),L=wallL(r,wv.wall);
+  $('#wTitle').textContent=`${r.name}, parede ${wv.wall+1}: ${fmt(L)} m × ${fmt(S.pe)} m`;
+  $('#w2d').classList.toggle('on',wv.m==='2d');$('#w3d').classList.toggle('on',wv.m==='3d');
+  wc.classList.toggle('hidden',wv.m!=='2d');w3.classList.toggle('hidden',wv.m!=='3d');
+  $('#wChips').classList.toggle('hidden',wv.m!=='2d');
+  let ch='<span class="mut">Adicionar:</span>';
+  for(const k in TY)ch+=`<button data-t="${k}" class="${wv.armed===k?'on':''}">${TY[k].n}</button>`;
+  ch+='<span class="mut">Escolha o item e toque na parede. Arraste para mover.</span>';
+  $('#wChips').innerHTML=ch;
+  $('#wChips').querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{wv.armed=wv.armed===b.dataset.t?null:b.dataset.t;renderWall()});
+  requestAnimationFrame(()=>{
+    if(wv.m==='2d'){[WW,WH]=sizeCanvas(wc,wx);draw2d()}else{[WW,WH]=sizeCanvas(w3,w3x);draw3d()}
+    renderWPanel();
+  });
+}
+function renderWPanel(){
+  const p=$('#wPanel');
+  if(wv.m==='3d'){p.innerHTML='<div class="mut">Arraste na parede para girar. Os itens aparecem como foram posicionados na vista 2D.</div><div class="row"><button id="wReset">Vista frontal</button></div>';$('#wReset').onclick=()=>{wv.yaw=0;wv.pitch=0;draw3d()};return}
+  const r=curRoom(),w=curWall(),g=geomEl(),it=w.items.find(i=>i.id===wv.sel);
+  if(!it){p.innerHTML=`<div class="mut">${w.items.length?w.items.length+' item(ns) nesta parede. Toque em um item para editar.':'Nenhum item ainda. Escolha um tipo acima e toque na parede.'} Vista de dentro do ambiente.</div>`;return}
+  const dx=dispX(it,g);
+  p.innerHTML=`<div class="row"><b>${TY[it.t].n}</b><span class="mut">medidas em cm</span><span class="sp"></span><button class="bad" id="itDel">Excluir</button></div>
+  <div class="row">
+   <div class="fld">Da esquerda<input id="fx" inputmode="decimal" value="${cm(dx)}"></div>
+   <div class="fld">Do piso<input id="fy" inputmode="decimal" value="${cm(it.y)}"></div>
+   <div class="fld">Largura<input id="fw" inputmode="decimal" value="${cm(it.w)}"></div>
+   <div class="fld">Altura<input id="fh" inputmode="decimal" value="${cm(it.h)}"></div>
+  </div>`;
+  const upd=()=>{
+    const v=k=>{const n=num($(k).value);return n==null?null:n/100};
+    const nw=v('#fw'),nh=v('#fh'),ny=v('#fy'),nx=v('#fx');
+    snap();
+    if(nw!=null)it.w=clamp(nw,.03,g.L);if(nh!=null)it.h=clamp(nh,.03,g.H);
+    if(ny!=null)it.y=clamp(ny,0,Math.max(0,g.H-it.h));
+    if(nx!=null){const d=clamp(nx,0,Math.max(0,g.L-it.w));it.x=g.flip?g.L-d-it.w:d}
+    save();draw2d();renderWPanel();
+  };
+  ['#fx','#fy','#fw','#fh'].forEach(k=>$(k).onchange=upd);
+  $('#itDel').onclick=()=>{snap();w.items=w.items.filter(i=>i!==it);wv.sel=null;save();draw2d();renderWPanel()};
+}
+function geomEl(){
+  const r=curRoom(),L=wallL(r,wv.wall),H=S.pe,pad=60;
+  const s=Math.min((WW-pad*2)/L,(WH-pad*2)/H),ox=(WW-L*s)/2,top=(WH-H*s)/2;
+  return{L,H,s,ox,top,floor:top+H*s,flip:area(r.pts)<0};
+}
+const dispX=(it,g)=>g.flip?g.L-it.x-it.w:it.x;
+function itemRect(it,g){const x=g.ox+dispX(it,g)*g.s,y=g.floor-(it.y+it.h)*g.s;return{x,y,w:it.w*g.s,h:it.h*g.s}}
+function draw2d(){
+  const ctx=wx,g=geomEl(),w=curWall();ctx.clearRect(0,0,WW,WH);
+  // parede
+  ctx.fillStyle='#f8fafc';ctx.fillRect(g.ox,g.top,g.L*g.s,g.H*g.s);
+  ctx.lineWidth=2.5;ctx.strokeStyle='#334155';ctx.strokeRect(g.ox,g.top,g.L*g.s,g.H*g.s);
+  ctx.fillStyle='#cbd5e1';ctx.fillRect(g.ox-20,g.floor,g.L*g.s+40,6);
+  // cotas gerais
+  ctx.strokeStyle='#64748b';ctx.lineWidth=1;ctx.fillStyle='#334155';ctx.font='600 14px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  const ty=g.top-22;ctx.beginPath();ctx.moveTo(g.ox,ty);ctx.lineTo(g.ox+g.L*g.s,ty);ctx.moveTo(g.ox,ty-6);ctx.lineTo(g.ox,ty+6);ctx.moveTo(g.ox+g.L*g.s,ty-6);ctx.lineTo(g.ox+g.L*g.s,ty+6);ctx.stroke();
+  label(ctx,fmt(g.L)+' m',g.ox+g.L*g.s/2,ty);
+  const tx=g.ox-26;ctx.beginPath();ctx.moveTo(tx,g.top);ctx.lineTo(tx,g.floor);ctx.moveTo(tx-6,g.top);ctx.lineTo(tx+6,g.top);ctx.moveTo(tx-6,g.floor);ctx.lineTo(tx+6,g.floor);ctx.stroke();
+  label(ctx,fmt(g.H)+' m',tx,(g.top+g.floor)/2);
+  ctx.fillStyle='#94a3b8';ctx.font='12px system-ui,sans-serif';ctx.textAlign='left';ctx.fillText('esquerda',g.ox,g.floor+22);ctx.textAlign='right';ctx.fillText('direita',g.ox+g.L*g.s,g.floor+22);
+  // itens
+  w.items.forEach(it=>{
+    const rc=itemRect(it,g),T=TY[it.t],sel=it.id===wv.sel,over=it.y+it.h>g.H+.001||it.x<-.001||it.x+it.w>g.L+.001;
+    if(it.t==='porta'||it.t==='janela'){
+      ctx.fillStyle=it.t==='porta'?'rgba(180,83,9,.18)':'rgba(2,132,199,.18)';ctx.fillRect(rc.x,rc.y,rc.w,rc.h);
+      ctx.lineWidth=sel?4:2.5;ctx.strokeStyle=over?'#dc2626':T.c;ctx.strokeRect(rc.x,rc.y,rc.w,rc.h);
+      ctx.lineWidth=1.5;ctx.beginPath();
+      if(it.t==='janela'){ctx.moveTo(rc.x+rc.w/2,rc.y);ctx.lineTo(rc.x+rc.w/2,rc.y+rc.h);ctx.moveTo(rc.x,rc.y+rc.h/2);ctx.lineTo(rc.x+rc.w,rc.y+rc.h/2)}
+      else{ctx.moveTo(rc.x+rc.w*.85,rc.y+rc.h*.5);ctx.arc(rc.x+rc.w*.85,rc.y+rc.h*.5,4,0,7)}
+      ctx.stroke();
+      ctx.fillStyle=T.c;ctx.font='600 12px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(T.n+' '+cm(it.w)+'×'+cm(it.h),rc.x+rc.w/2,rc.y+14);
+    }else{
+      const c={x:rc.x+rc.w/2,y:rc.y+rc.h/2},R=Math.max(13,rc.w/2);
+      ctx.fillStyle=T.c;
+      if(it.t==='agua'){ctx.beginPath();ctx.arc(c.x,c.y,R,0,7);ctx.fill();ctx.fillStyle='#fff';ctx.font='700 13px system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('A',c.x,c.y+1)}
+      else if(it.t==='tomada'){ctx.fillRect(c.x-R,c.y-R,R*2,R*2);ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(c.x-5,c.y,3,0,7);ctx.arc(c.x+5,c.y,3,0,7);ctx.fill()}
+      else{ctx.fillRect(c.x-R,c.y-R,R*2,R*2);ctx.fillStyle='#fff';ctx.fillRect(c.x-2,c.y-7,4,14)}
+      if(sel){ctx.lineWidth=3;ctx.strokeStyle='#2563eb';ctx.strokeRect(c.x-R-3,c.y-R-3,R*2+6,R*2+6)}
+      ctx.fillStyle=T.c;ctx.font='11px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(T.n,c.x,c.y-R-9);
+    }
+    if(sel){
+      const cxm=rc.x+rc.w/2,cym=rc.y+rc.h/2;
+      ctx.setLineDash([5,4]);ctx.lineWidth=1;ctx.strokeStyle='#2563eb';ctx.beginPath();
+      ctx.moveTo(g.ox,cym);ctx.lineTo(rc.x,cym);ctx.moveTo(rc.x+rc.w,cym);ctx.lineTo(g.ox+g.L*g.s,cym);ctx.moveTo(cxm,rc.y+rc.h);ctx.lineTo(cxm,g.floor);ctx.stroke();ctx.setLineDash([]);
+      label(ctx,cm(dispX(it,g))+' cm',(g.ox+rc.x)/2,cym-14,'#1d4ed8','#eff6ff');
+      label(ctx,cm(g.L-dispX(it,g)-it.w)+' cm',(rc.x+rc.w+g.ox+g.L*g.s)/2,cym+14,'#1d4ed8','#eff6ff');
+      label(ctx,cm(it.y)+' cm',cxm+36,(rc.y+rc.h+g.floor)/2,'#1d4ed8','#eff6ff');
+    }
+  });
+}
+function hitItem(px,py,g){
+  const w=curWall();
+  for(let k=w.items.length-1;k>=0;k--){
+    const it=w.items[k],rc=itemRect(it,g),pw=Math.max(0,(30-rc.w)/2),ph=Math.max(0,(30-rc.h)/2);
+    if(px>=rc.x-pw&&px<=rc.x+rc.w+pw&&py>=rc.y-ph&&py<=rc.y+rc.h+ph)return it;
+  }
+  return null;
+}
+let drag=null;
+wc.addEventListener('pointerdown',e=>{
+  wc.setPointerCapture(e.pointerId);
+  const g=geomEl(),w=curWall(),it=hitItem(e.offsetX,e.offsetY,g);
+  if(it){wv.sel=it.id;snap();const rc=itemRect(it,g);drag={it,ox:e.offsetX-(rc.x+rc.w/2),oy:e.offsetY-(rc.y+rc.h/2)};draw2d();renderWPanel();return}
+  if(wv.armed){
+    const T=TY[wv.armed];snap();
+    const wxm=(e.offsetX-g.ox)/g.s;const d=clamp(q05(wxm-T.w/2),0,Math.max(0,g.L-T.w));
+    const n={id:Date.now()%1e9+Math.floor(Math.random()*1000),t:wv.armed,w:T.w,h:T.h,y:Math.min(T.y,Math.max(0,g.H-T.h)),x:0};
+    n.x=g.flip?g.L-d-n.w:d;w.items.push(n);wv.sel=n.id;wv.armed=null;save();renderWall();return;
+  }
+  wv.sel=null;draw2d();renderWPanel();
+});
+wc.addEventListener('pointermove',e=>{
+  if(!drag)return;const g=geomEl(),it=drag.it;
+  const cxw=(e.offsetX-drag.ox-g.ox)/g.s,cyw=(g.floor-(e.offsetY-drag.oy))/g.s;
+  const d=clamp(q05(cxw-it.w/2),0,Math.max(0,g.L-it.w));
+  it.x=g.flip?g.L-d-it.w:d;it.y=clamp(q05(cyw-it.h/2),0,Math.max(0,g.H-it.h));
+  draw2d();
+});
+const endDrag=()=>{if(drag){drag=null;save();renderWPanel()}};
+wc.addEventListener('pointerup',endDrag);wc.addEventListener('pointercancel',endDrag);
+
+/* ---------- 3D ---------- */
+function draw3d(){
+  const ctx=w3x,r=curRoom(),w=curWall(),L=wallL(r,wv.wall),H=S.pe,T=.15,flip=area(r.pts)<0;
+  ctx.clearRect(0,0,WW,WH);
+  const ya=wv.yaw*Math.PI/180,pa=wv.pitch*Math.PI/180,cxm=L/2,cym=H/2,czm=T/2;
+  const raw=(x,y,z)=>{const a=x-cxm,b=y-cym,c=z-czm;const x1=a*Math.cos(ya)+c*Math.sin(ya),z1=-a*Math.sin(ya)+c*Math.cos(ya);return[x1,b*Math.cos(pa)+z1*Math.sin(pa),-b*Math.sin(pa)+z1*Math.cos(pa)]};
+  // ajuste de escala
+  let mnx=1e9,mxx=-1e9,mny=1e9,mxy=-1e9;
+  for(const x of[0,L])for(const y of[0,H])for(const z of[0,T]){const p=raw(x,y,z);mnx=Math.min(mnx,p[0]);mxx=Math.max(mxx,p[0]);mny=Math.min(mny,p[1]);mxy=Math.max(mxy,p[1])}
+  const s=Math.min((WW-100)/(mxx-mnx),(WH-100)/(mxy-mny)),ox=WW/2-(mnx+mxx)/2*s,oy=WH/2+(mny+mxy)/2*s;
+  const P=(x,y,z)=>{const p=raw(x,y,z);return[ox+p[0]*s,oy-p[1]*s,p[2]]};
+  const nrm=(nx,ny,nz)=>{const x1=nx*Math.cos(ya)+nz*Math.sin(ya),z1=-nx*Math.sin(ya)+nz*Math.cos(ya);return -ny*Math.sin(pa)+z1*Math.cos(pa)};
+  const faces=[
+    {n:[0,0,-1],c:'#f1f5f9',q:[[0,0,0],[L,0,0],[L,H,0],[0,H,0]]},
+    {n:[0,0,1],c:'#e2e8f0',q:[[0,0,T],[L,0,T],[L,H,T],[0,H,T]]},
+    {n:[-1,0,0],c:'#cbd5e1',q:[[0,0,0],[0,0,T],[0,H,T],[0,H,0]]},
+    {n:[1,0,0],c:'#cbd5e1',q:[[L,0,0],[L,0,T],[L,H,T],[L,H,0]]},
+    {n:[0,1,0],c:'#e5eaf0',q:[[0,H,0],[L,H,0],[L,H,T],[0,H,T]]},
+    {n:[0,-1,0],c:'#94a3b8',q:[[0,0,0],[L,0,0],[L,0,T],[0,0,T]]}
+  ].filter(f=>nrm(...f.n)<0).map(f=>({...f,p:f.q.map(v=>P(...v))}));
+  faces.sort((a,b)=>b.p.reduce((t,v)=>t+v[2],0)-a.p.reduce((t,v)=>t+v[2],0));
+  const poly=(pts,fill,stroke)=>{ctx.beginPath();pts.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()}};
+  // piso
+  const fl=[[-.6,0,-.6],[L+.6,0,-.6],[L+.6,0,T+.6],[-.6,0,T+.6]].map(v=>P(...v));poly(fl,'#e7e5e4','#d6d3d1');
+  faces.forEach(f=>poly(f.p,f.c,'#64748b'));
+  // aberturas e itens (face frontal, vista de dentro)
+  const fx=(it)=>flip?L-it.x-it.w:it.x; // coordenada x na face frontal ja em orientacao de visualizacao
+  // a face frontal e desenhada como vista de dentro: x do desenho = posicao exibida
+  w.items.forEach(it=>{
+    const x0=fx(it),x1=x0+it.w,y0=it.y,y1=it.y+it.h;
+    if(it.t==='porta'||it.t==='janela'){
+      const fr=[[x0,y0,0],[x1,y0,0],[x1,y1,0],[x0,y1,0]].map(v=>P(...v));
+      const bk=[[x0,y0,T],[x1,y0,T],[x1,y1,T],[x0,y1,T]].map(v=>P(...v));
+      ctx.save();ctx.beginPath();fr.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.clip();
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,WW,WH);
+      poly(bk,it.t==='janela'?'#bfe3ff':'#dbe3ec');
+      const rev=[
+        {n:[1,0,0],q:[[x0,y0,0],[x0,y0,T],[x0,y1,T],[x0,y1,0]]},
+        {n:[-1,0,0],q:[[x1,y0,0],[x1,y0,T],[x1,y1,T],[x1,y1,0]]},
+        {n:[0,1,0],q:[[x0,y0,0],[x1,y0,0],[x1,y0,T],[x0,y0,T]]},
+        {n:[0,-1,0],q:[[x0,y1,0],[x1,y1,0],[x1,y1,T],[x0,y1,T]]}
+      ];
+      rev.filter(f=>nrm(...f.n)<0).forEach(f=>poly(f.q.map(v=>P(...v)),'#d5dde7','#94a3b8'));
+      ctx.restore();
+      poly(fr,null,it.t==='janela'?'#0284c7':'#b45309');ctx.lineWidth=3;ctx.stroke();
+      if(it.t==='janela'){const m=[[x0,(y0+y1)/2,0],[x1,(y0+y1)/2,0]].map(v=>P(...v)),m2=[[(x0+x1)/2,y0,0],[(x0+x1)/2,y1,0]].map(v=>P(...v));ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(m[0][0],m[0][1]);ctx.lineTo(m[1][0],m[1][1]);ctx.moveTo(m2[0][0],m2[0][1]);ctx.lineTo(m2[1][0],m2[1][1]);ctx.stroke()}
+    }else{
+      const c=P((x0+x1)/2,(y0+y1)/2,0),R=Math.max(7,it.w*s/2),T2=TY[it.t];
+      ctx.fillStyle=T2.c;
+      if(it.t==='agua'){ctx.beginPath();ctx.arc(c[0],c[1],R,0,7);ctx.fill()}
+      else{ctx.fillRect(c[0]-R,c[1]-R,R*2,R*2);ctx.fillStyle='#fff';if(it.t==='tomada'){ctx.beginPath();ctx.arc(c[0]-R/2.4,c[1],R/5,0,7);ctx.arc(c[0]+R/2.4,c[1],R/5,0,7);ctx.fill()}else ctx.fillRect(c[0]-1.5,c[1]-R/2,3,R)}
+    }
+  });
+  ctx.fillStyle='#334155';ctx.font='600 14px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(`${fmt(L)} m × ${fmt(H)} m, espessura ${cm(T)} cm (ilustrativa)`,WW/2,26);
+}
+let d3=null;
+w3.addEventListener('pointerdown',e=>{w3.setPointerCapture(e.pointerId);d3={x:e.offsetX,y:e.offsetY,yaw:wv.yaw,pitch:wv.pitch}});
+w3.addEventListener('pointermove',e=>{if(!d3)return;wv.yaw=clamp(d3.yaw+(e.offsetX-d3.x)*.35,-75,75);wv.pitch=clamp(d3.pitch+(e.offsetY-d3.y)*.25,-5,60);draw3d()});
+w3.addEventListener('pointerup',()=>d3=null);w3.addEventListener('pointercancel',()=>d3=null);
+
+/* ---------- cabecalho ---------- */
+const peIn=$('#pe');peIn.value=fmt(S.pe);
+peIn.onchange=()=>{const v=num(peIn.value);if(v==null||v<1.8||v>8){toast('Pé-direito entre 1,80 e 8,00 m');peIn.value=fmt(S.pe);return}snap();S.pe=v;peIn.value=fmt(v);save();if(!$('#vWall').classList.contains('hidden'))renderWall();toast('Pé-direito aplicado a todas as paredes')};
+$('#btnExport').onclick=()=>{
+  const out={versao:1,pe_direito_m:S.pe,ambientes:S.rooms.map(r=>({nome:r.name,area_m2:+Math.abs(area(r.pts)).toFixed(2),paredes:r.pts.map((_,i)=>({n:i+1,comprimento_m:+wallL(r,i).toFixed(3),medida_pela_trena:r.walls[i].m!=null,itens:r.walls[i].items.map(it=>({tipo:TY[it.t].n,da_esquerda_cm:cm(it.x),do_piso_cm:cm(it.y),largura_cm:cm(it.w),altura_cm:cm(it.h)}))})),pontos_m:r.pts}))};
+  const txt=JSON.stringify(out,null,2);
+  modal('<h3>Exportar planta</h3><div class="mut">Copie os dados ou baixe o arquivo.</div><textarea id="expTxt" readonly style="height:180px;font:12px monospace;border:1px solid var(--line);border-radius:10px;padding:8px"></textarea><div class="row"><button class="pri" id="expCopy">Copiar</button><button id="expDl">Baixar .json</button><button id="expX">Fechar</button></div>',m=>{
+    $('#expTxt').value=txt;
+    $('#expCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('Copiado')}catch(e){$('#expTxt').select();toast('Selecione e copie manualmente')}};
+    $('#expDl').onclick=()=>{try{const b=new Blob([txt],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='planta.json';a.click()}catch(e){toast('Download bloqueado, use Copiar')}};
+    $('#expX').onclick=closeModal;
+  });
+};
+$('#btnNovo').onclick=()=>modal('<h3>Começar uma planta nova?</h3><div class="mut">Isso apaga os ambientes atuais.</div><div class="row"><button class="bad" data-a="y" style="flex:1">Apagar tudo</button><button data-a="n" style="flex:1">Cancelar</button></div>',m=>m.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{closeModal();if(b.dataset.a==='y'){snap();S={pe:S.pe,rooms:[],draft:null,selRoom:null,selWall:null,next:1};mode='draw';save();renderAll()}}));
+
+/* ---------- trena Bluetooth ---------- */
+let bt={dev:null,fmt:'auto',off:0,unit:'mm',log:[]};
+const hex=b=>[...b].map(x=>x.toString(16).padStart(2,'0')).join(' ');
+function btLog(t){bt.log.push(t);if(bt.log.length>60)bt.log.shift();const p=$('#btLog');if(p){p.textContent=bt.log.join('\n');p.scrollTop=1e9}}
+function parseBt(b){
+  const dv=new DataView(b.buffer,b.byteOffset,b.byteLength),k={mm:1e-3,cm:1e-2,m:1}[bt.unit],o=bt.off;
+  try{
+    if(bt.fmt==='u16')return dv.getUint16(o,true)*k;
+    if(bt.fmt==='u16b')return dv.getUint16(o,false)*k;
+    if(bt.fmt==='u32')return dv.getUint32(o,true)*k;
+    if(bt.fmt==='f32')return dv.getFloat32(o,true)*k;
+    const t=String.fromCharCode(...b).replace(/\0+$/,''),m=t.match(/(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?/);
+    if(m&&/^[\x20-\x7e\r\n]+$/.test(t)){const v=parseFloat(m[1].replace(',','.'));return m[2]==='mm'?v/1e3:m[2]==='cm'?v/100:v}
+  }catch(e){}
+  return null;
+}
+function btDisc(){$('#btnTrena').textContent='Trena: desconectada';btLog('Desconectou')}
+let lastRd={v:0,t:0};
+async function btConnect(){
+  if(!navigator.bluetooth){toast('Web Bluetooth não disponível. Use o Chrome no Android, com HTTPS.');return}
+  try{
+    const u=[0xffe0,0xfff0,0xfee0,0xae00,0xff00,0xffb0,0xfd00,0x180f,0x180a,'6e400001-b5a0-f393-e0a9-e50e24dcca9e'];
+    bt.dev=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:u});
+    btLog('Dispositivo: '+(bt.dev.name||'?'));
+    bt.dev.addEventListener('gattserverdisconnected',btDisc);
+    const srv=await bt.dev.gatt.connect(),svcs=await srv.getPrimaryServices();let n=0;
+    for(const s of svcs){btLog('Serviço '+s.uuid);if(s.uuid.startsWith('f000ffc0')){btLog('  (firmware, ignorado)');continue}for(const c of await s.getCharacteristics()){
+      const p=c.properties;btLog('  car. '+c.uuid.slice(4,8)+(p.notify?' notify':'')+(p.indicate?' indicate':'')+(p.write||p.writeWithoutResponse?' write':'')+(p.read?' read':''));
+      if(p.notify||p.indicate){try{await c.startNotifications();c.addEventListener('characteristicvaluechanged',ev=>{const b=new Uint8Array(ev.target.value.buffer);btLog(ev.target.uuid.slice(4,8)+': '+hex(b));const v=parseBt(b);if(v!=null&&isFinite(v)&&v>0){const r3=+v.toFixed(3),now=Date.now();if(r3===lastRd.v&&now-lastRd.t<1500)return;lastRd={v:r3,t:now};onReading(r3)}});n++}catch(e){btLog('  falha notify: '+e.message)}}
+    }}
+    $('#btnTrena').textContent='Trena: '+(bt.dev.name||'conectada');toast(n?'Trena conectada. Meça algo para ver os bytes.':'Conectou, mas sem canal de notificação');
+  }catch(e){btLog('Erro: '+e.message);toast('Bluetooth: '+e.message)}
+}
+$('#btnTrena').onclick=()=>modal(`<h3>Trena Bluetooth</h3>
+  <div class="mut">Conecte e dispare a trena. Os bytes recebidos aparecem abaixo. Se a medida não for reconhecida, ajuste o formato e o deslocamento até o número bater com o display da trena.</div>
+  <button class="pri" id="btC">Conectar trena</button>
+  <div class="row"><label>Formato <select id="btF"><option value="auto">Texto (auto)</option><option value="u16">Inteiro 16 bits (LE)</option><option value="u16b">Inteiro 16 bits (BE)</option><option value="u32">Inteiro 32 bits (LE)</option><option value="f32">Decimal 32 bits (LE)</option></select></label>
+  <label>Byte inicial <input id="btO" type="number" min="0" max="19" style="width:70px"></label>
+  <label>Unidade <select id="btU"><option value="mm">mm</option><option value="cm">cm</option><option value="m">m</option></select></label></div>
+  <pre id="btLog"></pre>
+  <button id="btX">Fechar</button>`,m=>{
+    $('#btF').value=bt.fmt;$('#btO').value=bt.off;$('#btU').value=bt.unit;$('#btLog').textContent=bt.log.join('\n');
+    $('#btF').onchange=e=>bt.fmt=e.target.value;$('#btO').onchange=e=>bt.off=+e.target.value||0;$('#btU').onchange=e=>bt.unit=e.target.value;
+    $('#btC').onclick=btConnect;$('#btX').onclick=closeModal;
+  });
+
+/* ---------- inicio ---------- */
+function renderAll(){renderSheet();drawPlan();if(!$('#vWall').classList.contains('hidden'))renderWall()}
+window.addEventListener('resize',()=>{if($('#vWall').classList.contains('hidden'))resizePlan();else renderWall()});
+window.__app={get S(){return S},openWall,onReading};
+requestAnimationFrame(()=>{resizePlan();renderSheet();if(S.rooms.length)fitView()});
+})();
+</script>
+</body>
+</html>
